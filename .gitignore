@@ -1,0 +1,8 @@
+build/
+out/
+logs/
+third_party/
+secure_boot_run.log
+secure_boot.log
+*.raw
+*.log

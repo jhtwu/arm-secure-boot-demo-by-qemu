@@ -1,0 +1,44 @@
+/dts-v1/;
+
+/ {
+    description = "Secure boot FIT image";
+    #address-cells = <1>;
+
+    images {
+        payload {
+            description = "Encrypted payload blob";
+            data = /incbin/("payload.bin");
+            type = "loadable";
+            arch = "arm64";
+            os = "u-boot";
+            compression = "none";
+            load = <0x60200000>;
+            entry = <0x00000000>;
+
+            hash-1 {
+                algo = "sha256";
+            };
+
+            cipher {
+                algo = "aes256";
+                key-name-hint = "enc";
+            };
+        };
+    };
+
+    configurations {
+        default = "conf";
+
+        conf {
+            description = "Verify + decrypt payload";
+            kernel = "payload";
+            loadables = "payload";
+
+            signature-1 {
+                algo = "sha256,rsa2048";
+                key-name-hint = "dev";
+                sign-images = "loadables";
+            };
+        };
+    };
+};

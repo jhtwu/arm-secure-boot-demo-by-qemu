@@ -20,6 +20,11 @@ UBOOT_DTB="$UBOOT_BUILD/arch/arm/dts/qemu-arm64.dtb"
 CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
 ARCH=arm
 NPROC=$(nproc)
+THIRD_PARTY_SOURCES=(
+    "u-boot|https://source.denx.de/u-boot/u-boot.git|master|2dbde3f9b08771b8182fcbf0bb0309acaff6c2e1"
+    "tf-a|https://github.com/ARM-software/arm-trusted-firmware.git|master|24804eeb334e17a34f7e755eda420cd83079f40b"
+    "mbedtls|https://github.com/Mbed-TLS/mbedtls.git|development|22098d41c6620ce07cf8a0134d37302355e1e5ef"
+)
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -29,12 +34,33 @@ require_cmd() {
 }
 
 prepare_dirs() {
-    mkdir -p "$BUILD_DIR" "$OUT_DIR" "$LOG_DIR" "$FIT_BUILD" "$FIT_KEYS_DIR"
+    mkdir -p "$SRC_DIR" "$BUILD_DIR" "$OUT_DIR" "$LOG_DIR" "$FIT_BUILD" "$FIT_KEYS_DIR"
 }
 
 check_prereqs() {
-    for cmd in openssl ${CROSS_COMPILE}gcc qemu-system-aarch64 python3 timeout script col; do
+    for cmd in git openssl ${CROSS_COMPILE}gcc qemu-system-aarch64 python3 timeout script col; do
         require_cmd "$cmd"
+    done
+}
+
+sync_third_party() {
+    mkdir -p "$SRC_DIR"
+    local entry name url branch commit dest
+    for entry in "${THIRD_PARTY_SOURCES[@]}"; do
+        IFS='|' read -r name url branch commit <<<"$entry"
+        dest="$SRC_DIR/$name"
+        if [[ -d "$dest/.git" ]]; then
+            echo "[=] Updating $name sources"
+            git -C "$dest" fetch origin >/dev/null
+        else
+            echo "[+] Cloning $name sources"
+            rm -rf "$dest"
+            git clone "$url" "$dest" >/dev/null
+        fi
+        # Always land on the pinned commit so build inputs stay deterministic.
+        git -C "$dest" fetch origin "$branch" >/dev/null || true
+        git -C "$dest" checkout -q "$commit"
+        git -C "$dest" reset --hard -q "$commit"
     done
 }
 
@@ -125,6 +151,7 @@ run_qemu() {
 main() {
     check_prereqs
     prepare_dirs
+    sync_third_party
     build_uboot
     generate_fit_keys
     prepare_fit_image

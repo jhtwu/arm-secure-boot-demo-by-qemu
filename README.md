@@ -42,6 +42,18 @@ Install the following packages on the host system:
 
 ---
 
+## Third-Party Sources | 第三方原始碼
+
+`scripts/secure_boot_demo.sh` automatically clones or updates the required upstream projects into `third_party/` on first use and pins them to known-good commits for reproducible builds:
+
+- **U-Boot** (`third_party/u-boot`): https://source.denx.de/u-boot/u-boot.git @ `2dbde3f9b08771b8182fcbf0bb0309acaff6c2e1`
+- **Trusted Firmware-A** (`third_party/tf-a`): https://github.com/ARM-software/arm-trusted-firmware.git @ `24804eeb334e17a34f7e755eda420cd83079f40b`
+- **Mbed TLS** (`third_party/mbedtls`): https://github.com/Mbed-TLS/mbedtls.git @ `22098d41c6620ce07cf8a0134d37302355e1e5ef`
+
+刪除 `third_party/` 後重新執行腳本即可重新抓取遠端原始碼；腳本會自動回復到上述固定版本，確保建置結果一致。
+
+---
+
 ## Initial Build & Run | 首次建置與執行
 
 ```bash

@@ -21,9 +21,9 @@ CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
 ARCH=arm
 NPROC=$(nproc)
 THIRD_PARTY_SOURCES=(
-    "u-boot|https://source.denx.de/u-boot/u-boot.git|master|2dbde3f9b08771b8182fcbf0bb0309acaff6c2e1"
-    "tf-a|https://github.com/ARM-software/arm-trusted-firmware.git|master|24804eeb334e17a34f7e755eda420cd83079f40b"
-    "mbedtls|https://github.com/Mbed-TLS/mbedtls.git|development|22098d41c6620ce07cf8a0134d37302355e1e5ef"
+    "u-boot|https://source.denx.de/u-boot/u-boot/-/archive/2dbde3f9b08771b8182fcbf0bb0309acaff6c2e1/u-boot-2dbde3f9b08771b8182fcbf0bb0309acaff6c2e1.tar.gz|2dbde3f9b08771b8182fcbf0bb0309acaff6c2e1"
+    "tf-a|https://github.com/ARM-software/arm-trusted-firmware/archive/24804eeb334e17a34f7e755eda420cd83079f40b.tar.gz|24804eeb334e17a34f7e755eda420cd83079f40b"
+    "mbedtls|https://github.com/Mbed-TLS/mbedtls/archive/22098d41c6620ce07cf8a0134d37302355e1e5ef.tar.gz|22098d41c6620ce07cf8a0134d37302355e1e5ef"
 )
 
 require_cmd() {
@@ -38,29 +38,32 @@ prepare_dirs() {
 }
 
 check_prereqs() {
-    for cmd in git openssl ${CROSS_COMPILE}gcc qemu-system-aarch64 python3 timeout script col; do
+    for cmd in curl tar openssl ${CROSS_COMPILE}gcc qemu-system-aarch64 python3 timeout script col; do
         require_cmd "$cmd"
     done
 }
 
 sync_third_party() {
     mkdir -p "$SRC_DIR"
-    local entry name url branch commit dest
+    local entry name url commit dest stamp tmp_dir
     for entry in "${THIRD_PARTY_SOURCES[@]}"; do
-        IFS='|' read -r name url branch commit <<<"$entry"
+        IFS='|' read -r name url commit <<<"$entry"
         dest="$SRC_DIR/$name"
-        if [[ -d "$dest/.git" ]]; then
-            echo "[=] Updating $name sources"
-            git -C "$dest" fetch origin >/dev/null
-        else
-            echo "[+] Cloning $name sources"
-            rm -rf "$dest"
-            git clone "$url" "$dest" >/dev/null
+        stamp="$dest/.source_commit"
+        if [[ -f "$stamp" ]] && [[ $(<"$stamp") == "$commit" ]]; then
+            echo "[=] $name already at $commit"
+            continue
         fi
-        # Always land on the pinned commit so build inputs stay deterministic.
-        git -C "$dest" fetch origin "$branch" >/dev/null || true
-        git -C "$dest" checkout -q "$commit"
-        git -C "$dest" reset --hard -q "$commit"
+        echo "[+] Fetching $name sources ($commit)"
+        tmp_dir=$(mktemp -d "$SRC_DIR/${name}.XXXXXX")
+        if ! curl -fsSL "$url" | tar -xz --strip-components=1 -C "$tmp_dir"; then
+            rm -rf "$tmp_dir"
+            echo "[!] Failed to download $name sources" >&2
+            exit 1
+        fi
+        rm -rf "$dest"
+        mv "$tmp_dir" "$dest"
+        echo "$commit" >"$stamp"
     done
 }
 
